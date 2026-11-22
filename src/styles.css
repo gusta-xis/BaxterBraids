@@ -81,3 +81,4 @@ footer small{width:100%;color:var(--baxter-color-text-on-dark-muted)}
 .footer-signature img{display:block;width:min(928px,100%);height:auto;opacity:.72}
 .stamp{color:var(--baxter-color-text-accent);border-color:var(--baxter-color-text-accent)}
 @media(max-width:680px){.brand{gap:7px}.brand .brand-mark{width:24px;height:28px}.footer-signature{padding:16px 0 4px}.footer-signature img{width:150%;max-width:none}}
+.header,.detail .header{position:fixed}
