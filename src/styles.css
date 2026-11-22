@@ -85,3 +85,74 @@ footer small{width:100%;color:var(--baxter-color-text-on-dark-muted)}
 .schedule>section:first-child{padding-left:76px}
 .schedule h1{letter-spacing:-.035em;word-spacing:.08em}
 @media(max-width:680px){.schedule>section:first-child{padding-left:70px}}
+
+/* Mobile layout hardening: every screen must fit without browser zoom or horizontal scroll. */
+img{max-width:100%}
+[id]{scroll-margin-top:90px}
+@media(max-width:680px){
+  html,body,#root{width:100%;max-width:100%;overflow-x:hidden}
+  .wrap{width:calc(100% - 28px)}
+  .header{width:calc(100% - 24px);padding:0 12px;gap:8px}
+  .brand{min-width:0;font-size:clamp(17px,5vw,19px)}
+  .brand .brand-mark{width:23px;height:28px}
+  .mini-cta{flex:none;padding:9px 12px;font-size:12px}
+  .hero-copy{left:22px;right:22px;width:auto;max-width:calc(100% - 44px)}
+  .hero h1{font-size:clamp(43px,13vw,51px);letter-spacing:-.045em}
+  .hero-copy>p{max-width:100%;font-size:16px}
+  .actions{width:100%}
+  .actions .button{max-width:100%}
+  .featured-grid,.catalog-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .service-card,.card-copy,.section-head>*{min-width:0}
+  .card-copy h3{overflow-wrap:anywhere}
+  .about{grid-template-columns:1fr;min-height:0}
+  .about-photo{min-height:370px}
+  .about-photo:after{background:linear-gradient(0deg,var(--surface),transparent 36%)}
+  .about-copy{padding:40px 24px 48px}
+  .benefits{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .process-grid{grid-template-columns:1fr;gap:16px}
+  .cta{position:relative;width:calc(100% - 28px);overflow:hidden}
+  .cta>div:first-child,.cta>div:last-child{position:relative;z-index:2}
+  .cta>div:last-child p{font-size:20px}
+  .cta img{pointer-events:none}
+  footer{width:calc(100% - 28px)}
+  .social{flex-wrap:wrap;gap:18px 26px}
+  .footer-signature img{width:100%;max-width:100%}
+  .catalog h1{overflow-wrap:anywhere}
+  .catalog-meta{gap:12px}
+  .detail{height:auto;min-height:100vh;padding-top:86px;overflow:visible}
+  .detail-photo{position:relative;left:auto;top:auto;width:100%;height:min(62vh,520px);min-height:360px}
+  .detail-photo .round{top:18px}
+  .back{left:18px}
+  .fav{right:18px}
+  .detail-copy{position:relative;left:auto;top:auto;width:100%;height:auto;padding:36px 22px 64px;overflow:visible}
+  .detail-copy h1{font-size:clamp(36px,11vw,43px);overflow-wrap:anywhere}
+  .metrics{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .metrics div{padding:14px 10px;min-width:0}
+  .metrics b{overflow-wrap:anywhere}
+  .schedule{width:calc(100% - 28px);padding-top:100px;min-height:0}
+  .schedule>section:first-child{padding-left:0}
+  .schedule .round{position:static;margin-bottom:20px}
+  .schedule h1{font-size:clamp(36px,11vw,42px);margin:10px 0 38px;overflow-wrap:anywhere}
+  .choices{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;width:100%}
+  .choices button{width:100%;min-width:0;height:68px}
+  .times{grid-template-columns:repeat(2,minmax(0,1fr));width:100%;gap:12px}
+  .schedule>section:last-child{margin-top:48px}
+  .schedule .summary{height:auto;min-height:170px}
+  textarea{height:180px}
+  .confirmation{display:flex;min-height:100vh;flex-direction:column;justify-content:center;padding:108px 18px 40px}
+  .confirmation>.check{flex:none;margin:0 auto 12px}
+  .confirmation>div:last-child{width:100%}
+  .confirmation h1{font-size:clamp(34px,10vw,40px);overflow-wrap:anywhere}
+}
+@media(max-width:360px){
+  .header{padding:0 10px}
+  .brand{font-size:16px;gap:5px}
+  .brand .brand-mark{width:20px;height:24px}
+  .mini-cta{padding:8px 10px;font-size:11px}
+  .featured-grid,.catalog-grid{grid-template-columns:1fr}
+  .card-media,.catalog-grid .card-media{height:250px}
+  .benefits{grid-template-columns:1fr}
+  .choices{gap:4px}
+  .choices button{height:62px;padding:0}
+  .metrics{grid-template-columns:1fr}
+}
