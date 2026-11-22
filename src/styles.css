@@ -82,3 +82,6 @@ footer small{width:100%;color:var(--baxter-color-text-on-dark-muted)}
 .stamp{color:var(--baxter-color-text-accent);border-color:var(--baxter-color-text-accent)}
 @media(max-width:680px){.brand{gap:7px}.brand .brand-mark{width:24px;height:28px}.footer-signature{padding:16px 0 4px}.footer-signature img{width:150%;max-width:none}}
 .header,.detail .header{position:fixed}
+.schedule>section:first-child{padding-left:76px}
+.schedule h1{letter-spacing:-.035em;word-spacing:.08em}
+@media(max-width:680px){.schedule>section:first-child{padding-left:70px}}
