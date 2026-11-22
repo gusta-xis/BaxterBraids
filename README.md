@@ -78,3 +78,22 @@ Mulheres e homens interessados em tranças e estética capilar que buscam:
 ---
 
 🚧 *Projeto em Desenvolvimento*
+
+---
+
+## Deploy na Vercel
+
+O projeto está configurado como uma SPA Vite. O arquivo `vercel.json` define o build, a pasta de saída e o fallback necessário para que rotas como `/catalogo`, `/estilo/:id` e `/agendar/:id` funcionem quando abertas diretamente.
+
+1. Envie o repositório para o GitHub.
+2. Na Vercel, selecione **Add New → Project** e importe o repositório.
+3. Mantenha o preset **Vite**. As configurações já estão no `vercel.json`:
+   - Build Command: `npm run build`
+   - Output Directory: `dist`
+4. Em **Settings → Environment Variables**, crie:
+   - Nome: `VITE_WHATSAPP_NUMBER`
+   - Valor: número completo com DDI e DDD, somente algarismos. Exemplo: `5511999999999`
+   - Ambientes: Production, Preview e Development
+5. Faça o deploy. Se alterar a variável depois, execute um novo deploy para ela entrar no bundle.
+
+O número do WhatsApp é público por natureza e será incluído no JavaScript enviado ao navegador. Não coloque senhas, tokens ou outras credenciais em variáveis iniciadas por `VITE_`.
