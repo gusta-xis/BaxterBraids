@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react';
-import { ImagePlus, Sparkles, X } from 'lucide-react';
+import { CircleCheck, ImagePlus, Sparkles, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { Service } from './data';
 import { getTryOnReference, MAX_SELFIE_BYTES, MAX_SELFIE_SIDE, TRY_ON_PATH } from './tryOnCatalog';
@@ -70,10 +70,15 @@ function TryOnContent({ item }: { item: Service }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const pending = useRef<AbortController | null>(null);
+  const statusRef = useRef<HTMLDivElement>(null);
   const selfieUrl = useObjectUrl(selfie);
   const resultUrl = useObjectUrl(result);
 
   useEffect(() => () => pending.current?.abort(), []);
+
+  useEffect(() => {
+    if (resultUrl) statusRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [resultUrl]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -185,6 +190,11 @@ function TryOnContent({ item }: { item: Service }) {
       {availability === 'unavailable' && (
         <p>O provador está indisponível no momento. Tente novamente mais tarde.</p>
       )}
+      <div ref={statusRef} className={resultUrl ? 'try-on-status ready' : 'try-on-status'} role="status" aria-atomic="true">
+        {resultUrl ? (
+          <><CircleCheck size={18} aria-hidden="true" /> Sua simulação está pronta!</>
+        ) : availability === 'checking' ? 'Verificando disponibilidade…' : busy ? 'Gerando a simulação…' : null}
+      </div>
       {displayUrl && (
         <figure className="try-on-preview">
           <img src={displayUrl} alt={displayingResult ? `Simulação de ${item.name} na sua foto` : 'Sua selfie original'} />
@@ -193,10 +203,9 @@ function TryOnContent({ item }: { item: Service }) {
       )}
       {selfieUrl && !result && (
         <button className="button full" type="button" disabled={busy} onClick={generate}>
-          <Sparkles size={18} aria-hidden="true" /> Gerar simulação grátis
+          <Sparkles size={18} aria-hidden="true" /> {busy ? 'Gerando simulação…' : 'Gerar simulação grátis'}
         </button>
       )}
-      <div role="status">{availability === 'checking' ? 'Verificando disponibilidade…' : busy ? 'Gerando a simulação…' : result ? 'Simulação pronta.' : ''}</div>
       {error && <p className="try-on-error" role="alert">{error}</p>}
       {resultUrl && (
         <button className="button outline try-on-original" type="button" aria-pressed={showOriginal} onClick={() => setShowOriginal(current => !current)}>

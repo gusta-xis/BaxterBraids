@@ -79,8 +79,24 @@ body:has(.try-on-dialog[open]) {
   cursor: progress;
 }
 
-.try-on-content [role="status"]:empty {
+.try-on-status:empty {
   position: absolute;
+}
+
+.try-on-status.ready {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 14px;
+  border: 1px solid #3e5d2e;
+  border-radius: var(--baxter-radius-sm);
+  color: #e1f5cb;
+  background: #1b2a16;
+  font-weight: 600;
+}
+
+.try-on-status.ready svg {
+  flex: none;
 }
 
 .try-on-content .try-on-error {
