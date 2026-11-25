@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useScroll, useSpring } from 'framer-motion';
 import { ArrowLeft, ArrowUpRight, CalendarDays, Check, Heart, Search, Sparkles, UserRound, MessageCircle } from 'lucide-react';
 import { Link, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { money, services, Service } from './data';
+import { BraidTryOn } from './BraidTryOn';
 
 const WA_NUMBER=(import.meta.env.VITE_WHATSAPP_NUMBER||'').replace(/\D/g,'');
 const WA=WA_NUMBER?`https://wa.me/${WA_NUMBER}`:'https://wa.me/';
@@ -20,7 +21,43 @@ function Home(){return <><Header/><main>
   <Reveal className="cta wrap"><div><h2>Marque presença.</h2></div><img src="/assets/home-04.png" alt=""/><div><p>Escolha seu estilo.<br/>O resto a gente constrói junto.</p><Button to="/catalogo">Escolher meu estilo</Button></div></Reveal>
  </main><Footer/></>}
 function Catalog(){const [q,setQ]=useState(''); const [filter,setFilter]=useState('Todos'); const filtered=useMemo(()=>services.filter(s=>(filter==='Todos'||s.category===filter)&&s.name.toLowerCase().includes(q.toLowerCase())),[q,filter]); return <><Header/><main className="catalog wrap"><Reveal><span className="eyebrow">CATÁLOGO BAXTER BRAIDS</span><h1>Encontre a trança perfeita<br/><em>para você</em></h1></Reveal><div className="search"><Search size={18}/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Busque por modelo ou estilo"/></div><div className="filters">{['Todos','Box braids','Nagô','Com cachos'].map(x=><button className={filter===x?'active':''} onClick={()=>setFilter(x)} key={x}>{x}</button>)}</div><div className="catalog-meta"><span>{filtered.length} modelos encontrados</span><span>Ordenar: <b>destaques</b></span></div><div className="catalog-grid"><AnimatePresence>{filtered.map((s,i)=><ServiceCard item={s} index={i} key={s.id}/>)}</AnimatePresence></div></main><Footer/></>}
-function Detail(){const {id}=useParams(); const nav=useNavigate(); const item=services.find(x=>x.id===id)||services[11]; const [fav,setFav]=useState(false); return <main className="detail"><div className="detail-photo"><img src={item.image} alt={item.name}/><div className="detail-shade"/><button className="round back" onClick={()=>nav(-1)}><ArrowLeft/></button><button className={`round fav ${fav?'on':''}`} onClick={()=>setFav(!fav)}><Heart fill={fav?'currentColor':'none'}/></button></div><Header/><motion.section className="detail-copy" initial={{opacity:0,x:40}} animate={{opacity:1,x:0}}><span className="eyebrow">ESTILO SELECIONADO</span><h1>{item.name}</h1><p className="lead">Volumosa, confortável e com acabamento que chama atenção sem pedir licença.</p><div className="metrics"><div><small>Preço</small><b>{money(item.price)}</b></div><div><small>Duração</small><b>{item.duration}</b></div><div><small>Manutenção</small><b>{item.maintenance}</b></div></div><h2>Sobre o modelo</h2><p>{item.description}</p><h2>Cuidados</h2><p>{item.care}</p><small>O valor pode variar conforme comprimento, volume e material escolhido.</small><Link className="button full" to={`/agendar/${item.id}`}>Escolher este modelo <ArrowUpRight size={17}/></Link></motion.section></main>}
+function Detail() {
+  const { id } = useParams();
+  const nav = useNavigate();
+  const item = services.find(x => x.id === id) || services[11];
+  const [fav, setFav] = useState(false);
+
+  return (
+    <main className="detail">
+      <div className="detail-photo">
+        <img src={item.image} alt={item.name} />
+        <div className="detail-shade" />
+        <button className="round back" onClick={() => nav(-1)}><ArrowLeft /></button>
+        <button className={`round fav ${fav ? 'on' : ''}`} onClick={() => setFav(!fav)}>
+          <Heart fill={fav ? 'currentColor' : 'none'} />
+        </button>
+      </div>
+      <Header />
+      <motion.section className="detail-copy" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }}>
+        <span className="eyebrow">ESTILO SELECIONADO</span>
+        <h1>{item.name}</h1>
+        <p className="lead">Volumosa, confortável e com acabamento que chama atenção sem pedir licença.</p>
+        <div className="metrics">
+          <div><small>Preço</small><b>{money(item.price)}</b></div>
+          <div><small>Duração</small><b>{item.duration}</b></div>
+          <div><small>Manutenção</small><b>{item.maintenance}</b></div>
+        </div>
+        <BraidTryOn key={item.id} item={item} />
+        <h2>Sobre o modelo</h2>
+        <p>{item.description}</p>
+        <h2>Cuidados</h2>
+        <p>{item.care}</p>
+        <small>O valor pode variar conforme comprimento, volume e material escolhido.</small>
+        <Link className="button full" to={`/agendar/${item.id}`}>Escolher este modelo <ArrowUpRight size={17} /></Link>
+      </motion.section>
+    </main>
+  );
+}
 function Schedule(){const {id}=useParams(); const nav=useNavigate(); const item=services.find(x=>x.id===id)||services[0]; const [day,setDay]=useState('20'); const [time,setTime]=useState('14:00'); const [notes,setNotes]=useState(''); return <><Header/><main className="schedule wrap"><section><button className="round" onClick={()=>nav(-1)}><ArrowLeft/></button><span className="eyebrow">SOLICITAR HORÁRIO</span><h1>Escolha seu horário</h1><h2>Escolha uma data</h2><div className="choices">{[['18','SEG'],['19','TER'],['20','QUA'],['21','QUI'],['22','SEX']].map(x=><button className={day===x[0]?'active':''} onClick={()=>setDay(x[0])} key={x[0]}><b>{x[0]}</b><small>{x[1]}</small></button>)}</div><h2>Horários disponíveis</h2><div className="times">{['09:00','11:00','14:00','16:30'].map(x=><button className={time===x?'active':''} onClick={()=>setTime(x)} key={x}>{x}</button>)}</div></section><section><div className="summary"><span className="eyebrow">RESUMO</span><h3>{item.name}</h3><p>{money(item.price)} · aprox. {item.duration}</p><b>Estilo selecionado</b></div><h2>Alguma observação?</h2><textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Ex.: prefiro tranças mais finas e gostaria de conversar sobre a cor."/><button className="button full" onClick={()=>nav(`/confirmacao/${item.id}`,{state:{day,time,notes}})}>Revisar solicitação <CalendarDays size={17}/></button><small className="helper">O horário só será confirmado pela profissional no WhatsApp.</small></section></main></>}
 function Confirmation(){const {id}=useParams(); const item=services.find(x=>x.id===id)||services[0]; const location=useLocation(); const state=location.state as {day?:string,time?:string}|null; const text=encodeURIComponent(`Olá! Gostaria de solicitar ${item.name}, dia ${state?.day||'20'} às ${state?.time||'14:00'}.`); return <main className="confirmation"><Header/><motion.div className="check" initial={{scale:0,rotate:-20}} animate={{scale:1,rotate:0}}><Check/></motion.div><motion.div initial={{opacity:0,y:25}} animate={{opacity:1,y:0}} transition={{delay:.2}}><h1>Solicitação pronta</h1><p>Envie os dados pelo WhatsApp para confirmar a disponibilidade.</p><div className="summary"><span className="eyebrow">RESUMO</span><h3>{item.name}</h3><p>Dia {state?.day||'20'} · {state?.time||'14:00'} · aprox. {item.duration}</p><b>{money(item.price)}</b></div><a className="button full" href={`${WA}?text=${text}`}>Enviar pelo WhatsApp <MessageCircle size={17}/></a><Link className="button outline full" to="/">Voltar para o início</Link></motion.div></main>}
 function Footer(){return <footer id="contato"><div><Brand/><p>Escolha seu estilo. A confirmação do horário acontece pelo WhatsApp.</p></div><div className="social"><a href="https://instagram.com/baxter_braids" target="_blank" rel="noreferrer"><img src="/assets/instagram.svg" alt=""/> Instagram</a><a href={WA}><img src="/assets/whatsapp.svg" alt=""/> WhatsApp</a></div><div className="footer-signature" aria-hidden="true"><img src="/assets/baxter-signature.svg" alt=""/></div><small>© 2026 Baxter Braids. Todos os direitos reservados.</small></footer>}

@@ -97,3 +97,25 @@ O projeto está configurado como uma SPA Vite. O arquivo `vercel.json` define o 
 5. Faça o deploy. Se alterar a variável depois, execute um novo deploy para ela entrar no bundle.
 
 O número do WhatsApp é público por natureza e será incluído no JavaScript enviado ao navegador. Não coloque senhas, tokens ou outras credenciais em variáveis iniciadas por `VITE_`.
+
+## Testar o provador generativo
+
+Com o Worker conectado, o botão **Experimentar na minha foto** aparece nas páginas de todos os modelos do catálogo. Cada simulação é gerada pelo FLUX.2 Klein 4B usando a foto enviada pela pessoa e a referência do modelo selecionado.
+
+Para gerar com sua selfie localmente, use Node.js 22.12 ou superior e uma conta Cloudflare no plano **Workers Free**.
+
+```sh
+npm ci
+npx --yes wrangler@4.168.0 login
+npm run dev:provador
+```
+
+Abra `http://localhost:8787/estilo/estilo-3` e selecione **Experimentar na minha foto**. O comando inicia o Worker local com a conexão remota ao Workers AI.
+
+O build de produção usa `VITE_PROVADOR_API_URL` de `.env.production` para se conectar a `/api/provador` do Worker. Essa variável é pública e pode ser sobrescrita na Vercel para trocar o endpoint. No Worker, configure `TRY_ON_ALLOWED_ORIGIN` com a origem exata do site: protocolo e domínio, sem barra final. `wrangler.jsonc` já contém a origem pública atual do BaxterBraids.
+
+Para publicar alterações no Worker ou nas fotos do catálogo, rode `npm run deploy:provador` antes de atualizar o site. O comando prepara uma referência JPEG de até 511 px para cada modelo a partir da própria foto do catálogo.
+
+Ao clicar em **Gerar simulação grátis**, o navegador reduz a selfie para até 511 px e a envia ao Worker. O Worker seleciona a referência do catálogo e pede a edição à Cloudflare. A aplicação não salva as imagens e responde com `Cache-Control: private, no-store`. A saída é limitada a 512 px em cada lado, e cada endereço tem até três tentativas por minuto por localidade do Worker.
+
+Mantenha a conta no plano Free para impedir cobranças por excedente. A cota gratuita é compartilhada pela conta. Quando ela acaba, o provador informa a indisponibilidade e mantém o atalho para agendar. [Cota do Workers AI](https://developers.cloudflare.com/workers-ai/platform/pricing/) · [Política de uso de dados](https://developers.cloudflare.com/workers-ai/platform/data-usage/)

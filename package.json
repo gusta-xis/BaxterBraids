@@ -4,7 +4,14 @@
   "version": "1.0.0",
   "type": "module",
   "engines": { "node": ">=20.19.0" },
-  "scripts": { "dev": "vite", "build": "tsc -b && vite build", "preview": "vite preview" },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "build:provador": "tsc -b && vite build --mode provador && node --experimental-strip-types scripts/prepare-provador-assets.mjs --site",
+    "dev:provador": "npm run build:provador && npx --yes wrangler@4.168.0 dev",
+    "deploy:provador": "node --experimental-strip-types scripts/prepare-provador-assets.mjs && npx --yes wrangler@4.168.0 deploy --assets .wrangler/provador-assets"
+  },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
     "framer-motion": "latest",
@@ -13,5 +20,11 @@
     "react-dom": "latest",
     "react-router-dom": "latest"
   },
-  "devDependencies": { "typescript": "latest", "vite": "latest", "@types/react": "latest", "@types/react-dom": "latest" }
+  "devDependencies": {
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "sharp": "0.35.5",
+    "typescript": "latest",
+    "vite": "latest"
+  }
 }
