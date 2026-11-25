@@ -100,7 +100,7 @@ O número do WhatsApp é público por natureza e será incluído no JavaScript e
 
 ## Testar o provador generativo
 
-O botão **Experimentar na minha foto** aparece nas páginas da Boxeadora com jumbo, Nagô topo e Box Braids. No site sem o Worker conectado, Boxeadora e Nagô mostram demonstrações com uma selfie sintética e um resultado gerado com FLUX.2 Klein 4B. Esse modo funciona com `npm run dev`.
+Com o Worker conectado, o botão **Experimentar na minha foto** aparece nas páginas da Boxeadora com jumbo, Nagô topo e Box Braids. Cada simulação é gerada pelo FLUX.2 Klein 4B usando a foto enviada pela pessoa e a referência do modelo selecionado.
 
 Para gerar com sua selfie localmente, use Node.js 22.12 ou superior e uma conta Cloudflare no plano **Workers Free**.
 
@@ -112,7 +112,7 @@ npm run dev:provador
 
 Abra `http://localhost:8787/estilo/estilo-3` e selecione **Experimentar na minha foto**. O comando inicia o Worker local com a conexão remota ao Workers AI.
 
-Para conectar um site hospedado separadamente, defina `VITE_PROVADOR_API_URL` durante o build com a URL HTTPS completa de `/api/provador` do Worker. No Worker, configure `TRY_ON_ALLOWED_ORIGIN` com a origem exata do site: protocolo e domínio, sem barra final. `wrangler.jsonc` já contém a origem pública atual do BaxterBraids.
+O build de produção usa `VITE_PROVADOR_API_URL` de `.env.production` para se conectar a `/api/provador` do Worker. Essa variável é pública e pode ser sobrescrita na Vercel para trocar o endpoint. No Worker, configure `TRY_ON_ALLOWED_ORIGIN` com a origem exata do site: protocolo e domínio, sem barra final. `wrangler.jsonc` já contém a origem pública atual do BaxterBraids.
 
 Ao clicar em **Gerar simulação grátis**, o navegador reduz a selfie para até 511 px e a envia ao Worker. O Worker seleciona a referência do catálogo e pede a edição à Cloudflare. A aplicação não salva as imagens e responde com `Cache-Control: private, no-store`. A saída é limitada a 512 px em cada lado, e cada endereço tem até três tentativas por minuto por localidade do Worker.
 

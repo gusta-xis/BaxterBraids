@@ -2,12 +2,14 @@ import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react';
 import { ImagePlus, Sparkles, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { Service } from './data';
-import { EXAMPLE_SELFIE, getTryOnReference, MAX_SELFIE_BYTES, MAX_SELFIE_SIDE, TRY_ON_PATH } from './tryOnCatalog';
+import { getTryOnReference, MAX_SELFIE_BYTES, MAX_SELFIE_SIDE, TRY_ON_PATH } from './tryOnCatalog';
 import './braidTryOn.css';
 
 const MAX_UPLOAD_SIZE = 15 * 1024 * 1024;
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const API_ENDPOINT = import.meta.env.VITE_PROVADOR_API_URL?.trim() || TRY_ON_PATH;
+const configuredEndpoint = import.meta.env.VITE_PROVADOR_API_URL?.trim();
+const API_ENDPOINT = configuredEndpoint || TRY_ON_PATH;
+const tryOnEnabled = Boolean(configuredEndpoint) || import.meta.env.MODE === 'provador' || import.meta.env.DEV;
 const messages: Readonly<Partial<Record<string, string>>> = {
   quota: 'As simulações gratuitas de hoje acabaram. Tente novamente após a renovação da cota.',
   rate_limit: 'Você fez várias tentativas seguidas. Aguarde um minuto e tente novamente.',
@@ -60,7 +62,7 @@ async function prepareSelfie(url: string) {
   return photo;
 }
 
-function TryOnContent({ item, example }: { item: Service; example?: string }) {
+function TryOnContent({ item }: { item: Service }) {
   const [availability, setAvailability] = useState<'checking' | 'available' | 'unavailable'>('checking');
   const [selfie, setSelfie] = useState<File>();
   const [result, setResult] = useState<Blob>();
@@ -164,14 +166,8 @@ function TryOnContent({ item, example }: { item: Service; example?: string }) {
     }
   }
 
-  const demo = availability === 'unavailable' ? example : undefined;
-  const comparisonOriginal = demo ? EXAMPLE_SELFIE : selfieUrl;
-  const comparisonResult = demo ?? resultUrl;
-  const displayingResult = Boolean(comparisonResult && !showOriginal);
-  const displayUrl = displayingResult ? comparisonResult : comparisonOriginal;
-  const imageAlt = demo
-    ? displayingResult ? `Exemplo de simulação de ${item.name}` : 'Selfie de exemplo original'
-    : displayingResult ? `Simulação de ${item.name} na sua foto` : 'Sua selfie original';
+  const displayingResult = Boolean(resultUrl && !showOriginal);
+  const displayUrl = displayingResult ? resultUrl : selfieUrl;
 
   return (
     <div className="try-on-content">
@@ -187,11 +183,11 @@ function TryOnContent({ item, example }: { item: Service; example?: string }) {
         </>
       )}
       {availability === 'unavailable' && (
-        <p>{demo ? 'Demonstração com uma selfie de exemplo. A geração com sua foto está indisponível agora.' : 'A geração com sua foto está indisponível agora.'}</p>
+        <p>O provador está indisponível no momento. Tente novamente mais tarde.</p>
       )}
       {displayUrl && (
         <figure className="try-on-preview">
-          <img src={displayUrl} alt={imageAlt} />
+          <img src={displayUrl} alt={displayingResult ? `Simulação de ${item.name} na sua foto` : 'Sua selfie original'} />
           <figcaption>{displayingResult ? 'Simulação por IA. O resultado real pode variar.' : 'Foto original'}</figcaption>
         </figure>
       )}
@@ -202,7 +198,7 @@ function TryOnContent({ item, example }: { item: Service; example?: string }) {
       )}
       <div role="status">{availability === 'checking' ? 'Verificando disponibilidade…' : busy ? 'Gerando a simulação…' : result ? 'Simulação pronta.' : ''}</div>
       {error && <p className="try-on-error" role="alert">{error}</p>}
-      {comparisonResult && (
+      {resultUrl && (
         <button className="button outline try-on-original" type="button" aria-pressed={showOriginal} onClick={() => setShowOriginal(current => !current)}>
           Ver foto original
         </button>
@@ -216,8 +212,7 @@ export function BraidTryOn({ item }: { item: Service }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const [open, setOpen] = useState(false);
-  const reference = getTryOnReference(item.id);
-  if (!reference) return null;
+  if (!tryOnEnabled || !getTryOnReference(item.id)) return null;
 
   return (
     <>
@@ -234,7 +229,7 @@ export function BraidTryOn({ item }: { item: Service }) {
             <X size={20} aria-hidden="true" />
           </button>
         </div>
-        {open && <TryOnContent item={item} example={reference.example} />}
+        {open && <TryOnContent item={item} />}
       </dialog>
     </>
   );
