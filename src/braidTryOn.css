@@ -80,7 +80,7 @@ body:has(.try-on-dialog[open]) {
 }
 
 .try-on-content [role="status"]:empty {
-  margin-top: -14px;
+  position: absolute;
 }
 
 .try-on-content .try-on-error {
@@ -94,7 +94,7 @@ body:has(.try-on-dialog[open]) {
   gap: 7px;
 }
 
-.try-on-preview canvas {
+.try-on-preview img {
   display: block;
   width: auto;
   height: auto;
@@ -116,39 +116,9 @@ body:has(.try-on-dialog[open]) {
   border-color: var(--green2);
 }
 
-.try-on-adjustments {
-  display: grid;
-  gap: 10px;
-  min-width: 0;
-  margin: 0;
-  padding: 10px 12px 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--baxter-radius-sm);
-}
-
-.try-on-adjustments label {
-  display: grid;
-  grid-template-columns: minmax(8.25rem, auto) minmax(0, 1fr);
-  gap: 10px;
-  align-items: center;
-  font-size: 0.875rem;
-}
-
-.try-on-adjustments input {
-  width: 100%;
-  margin: 0;
-  accent-color: #9cbd70;
-}
-
-.try-on-reset {
-  justify-self: start;
-  padding: 6px 0;
-  border: 0;
-  background: transparent;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-.try-on-adjustments:disabled {
-  opacity: 0.6;
+.try-on-content .button:disabled {
+  opacity: 0.65;
+  cursor: progress;
+  box-shadow: none;
+  transform: none;
 }

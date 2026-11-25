@@ -2,151 +2,168 @@ import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react';
 import { ImagePlus, Sparkles, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { Service } from './data';
-import {
-  defaultAdjustment, drawTryOn, makeHairLayer, placeOnFace, tryOnStyles,
-  type FacePlacement, type TryOnAdjustment, type TryOnStyle,
-} from './tryOnStyles';
+import { getTryOnReference, MAX_SELFIE_BYTES, MAX_SELFIE_SIDE, TRY_ON_PATH } from './tryOnCatalog';
 import './braidTryOn.css';
 
-const MAX_FILE_SIZE = 15 * 1024 * 1024;
-const MAX_IMAGE_SIDE = 1280;
+const MAX_UPLOAD_SIZE = 15 * 1024 * 1024;
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const adjustments = [
-  { key: 'x', label: 'Posição horizontal', min: -35, max: 35 },
-  { key: 'y', label: 'Posição vertical', min: -35, max: 35 },
-  { key: 'size', label: 'Tamanho', min: 70, max: 135 },
-] as const;
-
-type Preview = {
-  selfie: HTMLCanvasElement;
-  hair: HTMLCanvasElement;
-  placement: FacePlacement;
+const messages: Readonly<Partial<Record<string, string>>> = {
+  quota: 'As simulações gratuitas de hoje acabaram. Tente novamente após a renovação da cota.',
+  rate_limit: 'Você fez várias tentativas seguidas. Aguarde um minuto e tente novamente.',
+  busy: 'O provador está cheio agora. Tente novamente em instantes.',
+  invalid_photo: 'Use uma foto com a cabeça e os ombros no quadro, em formato vertical ou quadrado.',
 };
 
-class TryOnError extends Error {}
+class PreviewError extends Error {}
 
-async function loadImage(src: string) {
-  const image = new Image();
-  image.src = src;
-  await image.decode();
-  return image;
-}
-
-async function readSelfie(file: File) {
-  const url = URL.createObjectURL(file);
-  try {
-    const image = await loadImage(url);
-    const scale = Math.min(1, MAX_IMAGE_SIDE / Math.max(image.naturalWidth, image.naturalHeight));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error();
-    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-    return canvas;
-  } catch {
-    throw new TryOnError('Não foi possível abrir a foto. Escolha outro arquivo JPG, PNG ou WebP.');
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
-async function locateFaces(selfie: HTMLCanvasElement) {
-  try {
-    const { detectFaces } = await import('./faceDetection');
-    return await detectFaces(selfie);
-  } catch {
-    throw new TryOnError('O detector facial ficou indisponível. Confira a conexão ou tente em outro navegador.');
-  }
-}
-
-function TryOnContent({ item, style }: { item: Service; style: TryOnStyle }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [preview, setPreview] = useState<Preview>();
-  const [adjustment, setAdjustment] = useState(defaultAdjustment);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [showOriginal, setShowOriginal] = useState(false);
+function useObjectUrl(blob: Blob | undefined) {
+  const [url, setUrl] = useState<string>();
 
   useEffect(() => {
-    if (preview && canvasRef.current) {
-      drawTryOn(canvasRef.current, preview.selfie, preview.hair, style, preview.placement, adjustment, showOriginal);
-    }
-  }, [preview, style, adjustment, showOriginal]);
+    const next = blob && URL.createObjectURL(blob);
+    setUrl(next);
+    return () => { if (next) URL.revokeObjectURL(next); };
+  }, [blob]);
 
-  async function choosePhoto(event: ChangeEvent<HTMLInputElement>) {
+  return url;
+}
+
+async function prepareSelfie(url: string) {
+  const image = new Image();
+  image.src = url;
+  try {
+    await image.decode();
+  } catch {
+    throw new PreviewError('Não foi possível abrir a foto. Experimente outro arquivo JPG, PNG ou WebP.');
+  }
+
+  const { naturalWidth: width, naturalHeight: height } = image;
+  if (Math.min(width, height) / Math.max(width, height) < 0.5) {
+    throw new PreviewError(messages.invalid_photo);
+  }
+
+  const scale = Math.min(1, MAX_SELFIE_SIDE / Math.max(width, height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(width * scale);
+  canvas.height = Math.round(height * scale);
+  const context = canvas.getContext('2d', { alpha: false });
+  if (!context) throw new PreviewError('Este navegador não conseguiu preparar a foto.');
+  context.fillStyle = '#fff';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+  const photo = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.88));
+  if (!photo || photo.size > MAX_SELFIE_BYTES) {
+    throw new PreviewError('Não foi possível reduzir a foto. Experimente outro arquivo.');
+  }
+  return photo;
+}
+
+function TryOnContent({ item }: { item: Service }) {
+  const [selfie, setSelfie] = useState<File>();
+  const [result, setResult] = useState<Blob>();
+  const [showOriginal, setShowOriginal] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const pending = useRef<AbortController | null>(null);
+  const selfieUrl = useObjectUrl(selfie);
+  const resultUrl = useObjectUrl(result);
+
+  useEffect(() => () => pending.current?.abort(), []);
+
+  function choosePhoto(event: ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = '';
     if (!file) return;
 
+    setSelfie(undefined);
+    setResult(undefined);
+    setShowOriginal(false);
     setError('');
-    if (!IMAGE_TYPES.includes(file.type) || file.size > MAX_FILE_SIZE) {
+    if (!IMAGE_TYPES.includes(file.type) || file.size > MAX_UPLOAD_SIZE) {
       setError('Escolha uma foto JPG, PNG ou WebP de até 15 MB.');
       return;
     }
+    setSelfie(file);
+  }
 
+  async function generate() {
+    if (!selfieUrl || pending.current) return;
+    const controller = new AbortController();
+    pending.current = controller;
     setBusy(true);
+    setError('');
+
+    let timedOut = false;
+    const timer = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 45_000);
+
     try {
-      const selfie = await readSelfie(file);
-      const faces = await locateFaces(selfie);
-
-      if (faces.length === 0) {
-        throw new TryOnError('Nenhum rosto detectado. Tente uma selfie de frente, com boa luz e a cabeça inteira no quadro.');
+      const photo = await prepareSelfie(selfieUrl);
+      const response = await fetch(`${TRY_ON_PATH}?style=${encodeURIComponent(item.id)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'image/jpeg' },
+        body: photo,
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        const message = typeof data?.error === 'string' && Object.hasOwn(messages, data.error)
+          ? messages[data.error]
+          : undefined;
+        throw new PreviewError(message ?? 'Não foi possível gerar a simulação agora. Tente novamente em instantes.');
       }
-      if (faces.length > 1) {
-        throw new TryOnError('Encontramos mais de um rosto. Escolha uma foto em que você apareça sem companhia.');
+      if (!IMAGE_TYPES.includes(response.headers.get('Content-Type') ?? '')) {
+        throw new PreviewError('O provador está indisponível agora.');
       }
-
-      const photo = await loadImage(item.image);
-      const hair = makeHairLayer(photo, style);
-      const placement = placeOnFace(faces[0], selfie.width, selfie.height);
-      setPreview({ selfie, hair, placement });
-      setAdjustment(defaultAdjustment);
+      setResult(await response.blob());
       setShowOriginal(false);
     } catch (problem) {
-      setError(problem instanceof TryOnError ? problem.message : 'Não foi possível montar a prévia. Tente novamente.');
+      if (timedOut) {
+        setError('A simulação demorou mais do que o esperado. Tente novamente em instantes.');
+      } else if (!controller.signal.aborted) {
+        setError(problem instanceof PreviewError ? problem.message : 'Falha na conexão. Tente novamente.');
+      }
     } finally {
-      setBusy(false);
+      window.clearTimeout(timer);
+      pending.current = null;
+      if (!controller.signal.aborted || timedOut) setBusy(false);
     }
   }
 
-  function adjust(key: keyof TryOnAdjustment, value: number) {
-    setAdjustment(current => ({ ...current, [key]: value }));
-  }
+  const displayingResult = Boolean(resultUrl && !showOriginal);
+  const displayUrl = displayingResult ? resultUrl : selfieUrl;
 
   return (
     <div className="try-on-content">
       <p className="try-on-style">{item.name}</p>
-      <p>Use uma foto de frente, com a cabeça inteira no quadro e o cabelo preso. A foto fica no seu aparelho.</p>
+      <p>Escolha uma selfie com a cabeça e os ombros no quadro. Ao gerar a simulação, a foto será enviada à Cloudflare para processamento.</p>
       <label className="button outline try-on-upload" aria-disabled={busy}>
         <ImagePlus size={18} aria-hidden="true" />
-        {preview ? 'Trocar foto' : 'Escolher selfie'}
+        {selfie ? 'Trocar foto' : 'Escolher selfie'}
         <input type="file" accept={IMAGE_TYPES.join(',')} disabled={busy} onChange={choosePhoto} />
       </label>
-      <div role="status">{busy ? 'Detectando o rosto e preparando a prévia…' : ''}</div>
-      {error && <p className="try-on-error" role="alert">{error}</p>}
-      {preview && (
-        <>
-          <figure className="try-on-preview">
-            <canvas ref={canvasRef} role="img" aria-label={showOriginal ? 'Sua foto original' : `Sua foto com a prévia de ${item.name}`} />
-            <figcaption>{showOriginal ? 'Foto original' : 'Simulação aproximada'}</figcaption>
-          </figure>
-          <button className="button outline try-on-original" type="button" aria-pressed={showOriginal} onClick={() => setShowOriginal(current => !current)}>
-            Ver foto original
-          </button>
-          <fieldset className="try-on-adjustments" disabled={showOriginal}>
-            <legend>Ajustar encaixe</legend>
-            {adjustments.map(({ key, label, min, max }) => (
-              <label key={key}>
-                {label}
-                <input type="range" min={min} max={max} value={adjustment[key]} onChange={event => adjust(key, event.currentTarget.valueAsNumber)} />
-              </label>
-            ))}
-            <button type="button" className="try-on-reset" onClick={() => setAdjustment(defaultAdjustment)}>Restaurar ajuste</button>
-          </fieldset>
-          <Link className="button full" to={`/agendar/${item.id}`}>Agendar este modelo</Link>
-        </>
+      {displayUrl && (
+        <figure className="try-on-preview">
+          <img src={displayUrl} alt={displayingResult ? `Simulação de ${item.name} na sua foto` : 'Sua selfie original'} />
+          <figcaption>{displayingResult ? 'Simulação por IA. O resultado real pode variar.' : 'Foto original'}</figcaption>
+        </figure>
       )}
+      {selfieUrl && !result && (
+        <button className="button full" type="button" disabled={busy} onClick={generate}>
+          <Sparkles size={18} aria-hidden="true" /> Gerar simulação grátis
+        </button>
+      )}
+      <div role="status">{busy ? 'Gerando a simulação…' : result ? 'Simulação pronta.' : ''}</div>
+      {error && <p className="try-on-error" role="alert">{error}</p>}
+      {resultUrl && (
+        <button className="button outline try-on-original" type="button" aria-pressed={showOriginal} onClick={() => setShowOriginal(current => !current)}>
+          Ver foto original
+        </button>
+      )}
+      <Link className={`button full ${result ? '' : 'outline'}`} to={`/agendar/${item.id}`}>Agendar este modelo</Link>
     </div>
   );
 }
@@ -155,8 +172,7 @@ export function BraidTryOn({ item }: { item: Service }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const [open, setOpen] = useState(false);
-  const style = tryOnStyles[item.id];
-  if (!style) return null;
+  if (import.meta.env.MODE !== 'provador' || !getTryOnReference(item.id)) return null;
 
   return (
     <>
@@ -173,7 +189,7 @@ export function BraidTryOn({ item }: { item: Service }) {
             <X size={20} aria-hidden="true" />
           </button>
         </div>
-        {open && <TryOnContent item={item} style={style} />}
+        {open && <TryOnContent item={item} />}
       </dialog>
     </>
   );
