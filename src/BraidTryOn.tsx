@@ -2,11 +2,12 @@ import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react';
 import { ImagePlus, Sparkles, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { Service } from './data';
-import { getTryOnReference, MAX_SELFIE_BYTES, MAX_SELFIE_SIDE, TRY_ON_PATH } from './tryOnCatalog';
+import { EXAMPLE_SELFIE, getTryOnReference, MAX_SELFIE_BYTES, MAX_SELFIE_SIDE, TRY_ON_PATH } from './tryOnCatalog';
 import './braidTryOn.css';
 
 const MAX_UPLOAD_SIZE = 15 * 1024 * 1024;
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const API_ENDPOINT = import.meta.env.VITE_PROVADOR_API_URL?.trim() || TRY_ON_PATH;
 const messages: Readonly<Partial<Record<string, string>>> = {
   quota: 'As simulações gratuitas de hoje acabaram. Tente novamente após a renovação da cota.',
   rate_limit: 'Você fez várias tentativas seguidas. Aguarde um minuto e tente novamente.',
@@ -59,7 +60,8 @@ async function prepareSelfie(url: string) {
   return photo;
 }
 
-function TryOnContent({ item }: { item: Service }) {
+function TryOnContent({ item, example }: { item: Service; example?: string }) {
+  const [availability, setAvailability] = useState<'checking' | 'available' | 'unavailable'>('checking');
   const [selfie, setSelfie] = useState<File>();
   const [result, setResult] = useState<Blob>();
   const [showOriginal, setShowOriginal] = useState(false);
@@ -70,6 +72,33 @@ function TryOnContent({ item }: { item: Service }) {
   const resultUrl = useObjectUrl(result);
 
   useEffect(() => () => pending.current?.abort(), []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setAvailability('unavailable');
+      controller.abort();
+    }, 4_000);
+
+    void (async () => {
+      try {
+        const response = await fetch(API_ENDPOINT, { signal: controller.signal, cache: 'no-store' });
+        const status = response.ok ? await response.json() : null;
+        if (!controller.signal.aborted) {
+          setAvailability(status?.service === 'baxter-braids-provador' && status.available === true ? 'available' : 'unavailable');
+        }
+      } catch {
+        if (!controller.signal.aborted) setAvailability('unavailable');
+      } finally {
+        window.clearTimeout(timer);
+      }
+    })();
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, []);
 
   function choosePhoto(event: ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0];
@@ -88,7 +117,7 @@ function TryOnContent({ item }: { item: Service }) {
   }
 
   async function generate() {
-    if (!selfieUrl || pending.current) return;
+    if (availability !== 'available' || !selfieUrl || pending.current) return;
     const controller = new AbortController();
     pending.current = controller;
     setBusy(true);
@@ -102,7 +131,9 @@ function TryOnContent({ item }: { item: Service }) {
 
     try {
       const photo = await prepareSelfie(selfieUrl);
-      const response = await fetch(`${TRY_ON_PATH}?style=${encodeURIComponent(item.id)}`, {
+      const endpoint = new URL(API_ENDPOINT, window.location.origin);
+      endpoint.searchParams.set('style', item.id);
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'image/jpeg' },
         body: photo,
@@ -133,21 +164,34 @@ function TryOnContent({ item }: { item: Service }) {
     }
   }
 
-  const displayingResult = Boolean(resultUrl && !showOriginal);
-  const displayUrl = displayingResult ? resultUrl : selfieUrl;
+  const demo = availability === 'unavailable' ? example : undefined;
+  const comparisonOriginal = demo ? EXAMPLE_SELFIE : selfieUrl;
+  const comparisonResult = demo ?? resultUrl;
+  const displayingResult = Boolean(comparisonResult && !showOriginal);
+  const displayUrl = displayingResult ? comparisonResult : comparisonOriginal;
+  const imageAlt = demo
+    ? displayingResult ? `Exemplo de simulação de ${item.name}` : 'Selfie de exemplo original'
+    : displayingResult ? `Simulação de ${item.name} na sua foto` : 'Sua selfie original';
 
   return (
     <div className="try-on-content">
       <p className="try-on-style">{item.name}</p>
-      <p>Escolha uma selfie com a cabeça e os ombros no quadro. Ao gerar a simulação, a foto será enviada à Cloudflare para processamento.</p>
-      <label className="button outline try-on-upload" aria-disabled={busy}>
-        <ImagePlus size={18} aria-hidden="true" />
-        {selfie ? 'Trocar foto' : 'Escolher selfie'}
-        <input type="file" accept={IMAGE_TYPES.join(',')} disabled={busy} onChange={choosePhoto} />
-      </label>
+      {availability === 'available' && (
+        <>
+          <p>Escolha uma selfie com a cabeça e os ombros no quadro. Ao gerar a simulação, a foto será enviada à Cloudflare para processamento.</p>
+          <label className="button outline try-on-upload" aria-disabled={busy}>
+            <ImagePlus size={18} aria-hidden="true" />
+            {selfie ? 'Trocar foto' : 'Escolher selfie'}
+            <input type="file" accept={IMAGE_TYPES.join(',')} disabled={busy} onChange={choosePhoto} />
+          </label>
+        </>
+      )}
+      {availability === 'unavailable' && (
+        <p>{demo ? 'Demonstração com uma selfie de exemplo. A geração com sua foto está indisponível agora.' : 'A geração com sua foto está indisponível agora.'}</p>
+      )}
       {displayUrl && (
         <figure className="try-on-preview">
-          <img src={displayUrl} alt={displayingResult ? `Simulação de ${item.name} na sua foto` : 'Sua selfie original'} />
+          <img src={displayUrl} alt={imageAlt} />
           <figcaption>{displayingResult ? 'Simulação por IA. O resultado real pode variar.' : 'Foto original'}</figcaption>
         </figure>
       )}
@@ -156,9 +200,9 @@ function TryOnContent({ item }: { item: Service }) {
           <Sparkles size={18} aria-hidden="true" /> Gerar simulação grátis
         </button>
       )}
-      <div role="status">{busy ? 'Gerando a simulação…' : result ? 'Simulação pronta.' : ''}</div>
+      <div role="status">{availability === 'checking' ? 'Verificando disponibilidade…' : busy ? 'Gerando a simulação…' : result ? 'Simulação pronta.' : ''}</div>
       {error && <p className="try-on-error" role="alert">{error}</p>}
-      {resultUrl && (
+      {comparisonResult && (
         <button className="button outline try-on-original" type="button" aria-pressed={showOriginal} onClick={() => setShowOriginal(current => !current)}>
           Ver foto original
         </button>
@@ -172,7 +216,8 @@ export function BraidTryOn({ item }: { item: Service }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const [open, setOpen] = useState(false);
-  if (import.meta.env.MODE !== 'provador' || !getTryOnReference(item.id)) return null;
+  const reference = getTryOnReference(item.id);
+  if (!reference) return null;
 
   return (
     <>
@@ -189,7 +234,7 @@ export function BraidTryOn({ item }: { item: Service }) {
             <X size={20} aria-hidden="true" />
           </button>
         </div>
-        {open && <TryOnContent item={item} />}
+        {open && <TryOnContent item={item} example={reference.example} />}
       </dialog>
     </>
   );

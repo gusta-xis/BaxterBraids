@@ -8,6 +8,7 @@ interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
   AI: { run(model: string, input: { multipart: { body: ReadableStream<Uint8Array>; contentType: string } }): Promise<unknown> };
   TRY_ON_RATE_LIMIT: { limit(options: { key: string }): Promise<{ success: boolean }> };
+  TRY_ON_ALLOWED_ORIGIN?: string;
 }
 
 function fail(status: number, error: string, headers: Record<string, string> = {}) {
@@ -91,10 +92,6 @@ function providerFailure(error: unknown) {
 }
 
 async function tryOn(request: Request, url: URL, env: Env) {
-  if (request.method !== 'POST') return fail(405, 'method_not_allowed', { Allow: 'POST' });
-  const origin = request.headers.get('Origin');
-  if (origin && origin !== url.origin) return fail(403, 'forbidden');
-
   const reference = getTryOnReference(url.searchParams.get('style') ?? '');
   if (!reference) return fail(400, 'invalid_style');
   if (request.headers.get('Content-Type') !== 'image/jpeg' || !request.body) return fail(415, 'invalid_photo');
@@ -143,14 +140,35 @@ async function tryOn(request: Request, url: URL, env: Env) {
   }
 }
 
+async function handleApi(request: Request, url: URL, env: Env) {
+  if (request.method === 'GET') {
+    return Response.json({
+      service: 'baxter-braids-provador',
+      available: Boolean(env.AI && env.TRY_ON_RATE_LIMIT),
+    }, { headers: privateHeaders });
+  }
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: privateHeaders });
+  if (request.method === 'POST') return tryOn(request, url, env);
+  return fail(405, 'method_not_allowed', { Allow: 'GET, POST, OPTIONS' });
+}
+
 export default {
   async fetch(request: Request, env: Env) {
     const url = new URL(request.url);
     if (url.pathname !== TRY_ON_PATH) return env.ASSETS.fetch(request);
-    try {
-      return await tryOn(request, url, env);
-    } catch {
-      return fail(503, 'unavailable');
-    }
+
+    const origin = request.headers.get('Origin');
+    const externalOrigin = origin && origin !== url.origin ? origin : null;
+    if (externalOrigin && externalOrigin !== env.TRY_ON_ALLOWED_ORIGIN) return fail(403, 'forbidden');
+
+    const response = await handleApi(request, url, env).catch(() => fail(503, 'unavailable'));
+    if (!externalOrigin) return response;
+
+    const headers = new Headers(response.headers);
+    headers.set('Access-Control-Allow-Origin', externalOrigin);
+    headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    headers.set('Access-Control-Allow-Headers', 'Content-Type');
+    headers.append('Vary', 'Origin');
+    return new Response(response.body, { status: response.status, headers });
   },
 };

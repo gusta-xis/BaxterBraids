@@ -12,6 +12,9 @@
     "binding": "AI",
     "remote": true
   },
+  "vars": {
+    "TRY_ON_ALLOWED_ORIGIN": "https://baxter-braids.vercel.app"
+  },
   "ratelimits": [
     {
       "name": "TRY_ON_RATE_LIMIT",
