@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react';
 import { CircleCheck, ImagePlus, Sparkles, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { Service } from './data';
-import { getTryOnReference, MAX_SELFIE_BYTES, MAX_SELFIE_SIDE, TRY_ON_PATH } from './tryOnCatalog';
+import { MAX_SELFIE_BYTES, MAX_SELFIE_SIDE, TRY_ON_PATH } from './tryOnCatalog';
 import './braidTryOn.css';
 
 const MAX_UPLOAD_SIZE = 15 * 1024 * 1024;
@@ -221,7 +221,7 @@ export function BraidTryOn({ item }: { item: Service }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const [open, setOpen] = useState(false);
-  if (!tryOnEnabled || !getTryOnReference(item.id)) return null;
+  if (!tryOnEnabled) return null;
 
   return (
     <>

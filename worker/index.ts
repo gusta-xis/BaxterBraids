@@ -1,3 +1,4 @@
+import { services } from '../src/data';
 import { getTryOnReference, MAX_SELFIE_BYTES, MAX_SELFIE_SIDE, TRY_ON_PATH } from '../src/tryOnCatalog';
 
 const MODEL = '@cf/black-forest-labs/flux-2-klein-4b';
@@ -92,8 +93,10 @@ function providerFailure(error: unknown) {
 }
 
 async function tryOn(request: Request, url: URL, env: Env) {
-  const reference = getTryOnReference(url.searchParams.get('style') ?? '');
-  if (!reference) return fail(400, 'invalid_style');
+  const styleId = url.searchParams.get('style');
+  const style = services.find(service => service.id === styleId);
+  if (!style) return fail(400, 'invalid_style');
+  const reference = getTryOnReference(style);
   if (request.headers.get('Content-Type') !== 'image/jpeg' || !request.body) return fail(415, 'invalid_photo');
   if (Number(request.headers.get('Content-Length')) > MAX_SELFIE_BYTES) return fail(413, 'invalid_photo');
 
@@ -124,6 +127,7 @@ async function tryOn(request: Request, url: URL, env: Env) {
   form.append('prompt', [
     'Edit the first input image, the original selfie. The second input image is a hairstyle reference.',
     'Replace only the original hair with the braids from the reference.',
+    `The selected catalog style is "${style.name}".`,
     reference.details,
     'Fit the braids to the pose and angle of the head. The hair falls naturally around the neck and over the shoulders with matching light and shadows.',
     'Preserve the face, expression, skin tone, accessories, body proportions, pose, clothes, background and framing of the first photo.',
